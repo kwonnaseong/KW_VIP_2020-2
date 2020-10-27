@@ -89,50 +89,35 @@ criterion =nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 print(ConvNet)
 
-#Train the model
 for epoch in range(num_epochs):
+    for phase in ['train', 'val']:
+        if phase == 'train':
+            model.train()
+        else:
+            model.eval()
 
-    running_loss=0.0
-    running_corrects=0
+        running_loss = 0.0
+        running_corrects = 0
 
-    for i, (images, labels) in enumerate(dataloaders['train']):
-        images=images.to(device)
-        labels=labels.to(device)
+        for images, labels in dataloaders[phase]:
+            images = images.to(device)
+            labels = labels.to(device)
+            optimizer.zero_grad()
 
-        #Forward pass
-        outputs=model(images)
-        loss=criterion(outputs, labels)
-        _, preds=torch.max(outputs, 1)
+            with torch.set_grad_enabled(phase == 'train'):
+                outputs = model(images)
+                _, preds = torch.max(outputs, 1)
+                loss = criterion(outputs, labels)
 
-        #Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            if phase == 'train':
+                loss.backward()
+                optimizer.step()
 
-        running_loss+=loss.item()*images.size(0)
-        running_corrects+=torch.sum(preds == labels.data)
+            running_loss += loss.item() * images.size(0)
+            running_corrects += torch.sum(preds == labels.data)
 
-        epoch_loss=running_loss/dataset_sizes['train']
-        epoch_acc=running_corrects.double() / dataset_sizes['train']
+        epoch_loss = running_loss / dataset_sizes[phase]
+        epoch_acc = running_corrects.double() / dataset_sizes[phase]
 
-        if(i+1)%60==0:
-
-            print('Train Epoch [{}/{}], Loss {:.4f}, Acc: {:.4f}'.format(epoch+1, num_epochs, loss.item(), epoch_acc))
-
-#Test the model
-model.eval()
-with torch.no_grad():
-    correct =0
-    total=0
-    for i,(images, labels) in enumerate(dataloaders['val']):
-        images=images.to(device)
-        labels=labels.to(device)
-        outputs=model(images)
-        loss=criterion(outputs, labels)
-        _, predicted=torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct+=(predicted == labels).sum().item()
-
-    print('Val Loss : {:.4f} Acc :: {:.4f}'.format(loss.item(), 100*correct/total))
-
+        print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
 
